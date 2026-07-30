@@ -381,9 +381,10 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             background: #111827;
             border: 1px solid var(--card-border);
             border-radius: 16px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 90vh;
+            width: 95vw;
+            max-width: 1400px;
+            height: 94vh;
+            max-height: 94vh;
             display: flex;
             flex-direction: column;
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
@@ -396,6 +397,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .modal-body {
@@ -403,7 +405,30 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            gap: 1.25rem;
+            flex: 1;
+        }
+
+        #formTabContent {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            flex: 1;
+        }
+
+        #rawTabContent {
+            display: flex;
+            flex-direction: column;
             gap: 1rem;
+            flex: 1;
+            height: 100%;
+        }
+
+        #rawTabContent .form-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            height: 100%;
         }
 
         .form-group {
@@ -422,7 +447,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             background: rgba(22, 30, 49, 0.9);
             border: 1px solid var(--card-border);
             border-radius: 8px;
-            padding: 0.6rem 0.85rem;
+            padding: 0.65rem 0.85rem;
             color: var(--text-primary);
             font-family: inherit;
             font-size: 0.875rem;
@@ -431,18 +456,21 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
         .form-control:focus {
             border-color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
         }
 
         textarea.form-control {
             font-family: 'JetBrains Mono', monospace;
-            min-height: 250px;
+            min-height: 420px;
+            flex: 1;
             resize: vertical;
+            line-height: 1.5;
         }
 
         .form-row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.25rem;
         }
 
         .form-check {
@@ -466,6 +494,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             justify-content: flex-end;
             gap: 0.75rem;
             background: rgba(11, 15, 25, 0.6);
+            flex-shrink: 0;
         }
 
         .modal-tabs {
@@ -474,6 +503,50 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             margin-bottom: 0.5rem;
             border-bottom: 1px solid var(--card-border);
             padding-bottom: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 900px) {
+            .navbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+
+            .sys-status {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .tabs {
+                overflow-x: auto;
+                padding-bottom: 0.25rem;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+            .modal-content {
+                width: 98vw;
+                height: 98vh;
+                max-height: 98vh;
+                border-radius: 12px;
+            }
+
+            .modal-body {
+                padding: 1rem;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Toast Notifications */
@@ -906,13 +979,13 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             if (tab === 'form') {
                 document.getElementById('tabFormBtn').classList.add('active');
                 document.getElementById('tabRawBtn').classList.remove('active');
-                document.getElementById('formTabContent').style.display = 'block';
+                document.getElementById('formTabContent').style.display = 'flex';
                 document.getElementById('rawTabContent').style.display = 'none';
             } else {
                 document.getElementById('tabRawBtn').classList.add('active');
                 document.getElementById('tabFormBtn').classList.remove('active');
                 document.getElementById('formTabContent').style.display = 'none';
-                document.getElementById('rawTabContent').style.display = 'block';
+                document.getElementById('rawTabContent').style.display = 'flex';
             }
         }
 

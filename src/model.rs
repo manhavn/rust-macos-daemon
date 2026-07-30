@@ -50,8 +50,8 @@ impl std::str::FromStr for ServiceScope {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "user" | "u" => Ok(ServiceScope::User),
-            "global" | "global-agent" | "g" => Ok(ServiceScope::GlobalAgent),
-            "system" | "system-daemon" | "sys" | "s" | "root" => Ok(ServiceScope::SystemDaemon),
+            "global" | "global-agent" | "global_agent" | "g" => Ok(ServiceScope::GlobalAgent),
+            "system" | "system-daemon" | "system_daemon" | "sys" | "s" | "root" => Ok(ServiceScope::SystemDaemon),
             _ => Err(anyhow::anyhow!("Unknown scope: '{}'. Valid scopes: user, global, system", s)),
         }
     }

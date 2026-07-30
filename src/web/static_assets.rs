@@ -757,7 +757,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                     statusBadge = '<span style="color: var(--accent-amber); font-weight:600;">● Loaded (Stopped)</span>';
                 }
 
-                const cmd = s.plist_data && s.plist_data.ProgramArguments ? s.plist_data.ProgramArguments.join(' ') : (s.plist_data && s.plist_data.Program ? s.plist_data.Program : 'Unknown');
+                const logPath = s.plist_data ? (s.plist_data.StandardOutPath || s.plist_data.StandardErrorPath || '') : '';
 
                 card.innerHTML = `
                     <div>
@@ -773,25 +773,25 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                     </div>
                     <div class="service-actions">
                         ${s.pid !== null ? 
-                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'stop')">Stop</button>` :
-                            `<button class="btn btn-primary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'start')">Start</button>`
+                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'stop')">Stop</button>` :
+                            `<button class="btn btn-primary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'start')">Start</button>`
                         }
                         ${s.is_loaded ? 
-                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'unload')">Unload</button>` :
-                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'load')">Load</button>`
+                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'unload')">Unload</button>` :
+                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'load')">Load</button>`
                         }
-                        <button class="btn btn-secondary btn-sm" onclick="openEditModal('${s.label}', '${s.scope}')">Edit</button>
-                        ${s.plist_data && s.plist_data.StandardOutPath ? 
-                            `<button class="btn btn-secondary btn-sm" onclick="viewLog('${s.plist_data.StandardOutPath}')">Log</button>` : ''
-                        }
-                        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${s.label}', '${s.scope}')">Delete</button>
+                        <button class="btn btn-secondary btn-sm" onclick="openEditModal('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}')">Edit</button>
+                        <button class="btn btn-secondary btn-sm" onclick="viewLog('${encodeURIComponent(logPath)}', '${encodeURIComponent(s.label)}')">Log</button>
+                        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}')">Delete</button>
                     </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        async function triggerAction(label, scope, action) {
+        async function triggerAction(encodedLabel, encodedScope, action) {
+            const label = decodeURIComponent(encodedLabel);
+            const scope = decodeURIComponent(encodedScope);
             try {
                 const res = await fetch(`/api/services/${encodeURIComponent(label)}/action`, {
                     method: 'POST',
@@ -810,7 +810,9 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             }
         }
 
-        async function confirmDelete(label, scope) {
+        async function confirmDelete(encodedLabel, encodedScope) {
+            const label = decodeURIComponent(encodedLabel);
+            const scope = decodeURIComponent(encodedScope);
             if (confirm(`Are you sure you want to delete service "${label}"? This will unload and remove its plist file.`)) {
                 try {
                     const res = await fetch(`/api/services/${encodeURIComponent(label)}?scope=${encodeURIComponent(scope)}`, {
@@ -843,7 +845,9 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             document.getElementById('serviceModal').classList.add('active');
         }
 
-        async function openEditModal(label, scope) {
+        async function openEditModal(encodedLabel, encodedScope) {
+            const label = decodeURIComponent(encodedLabel);
+            const scope = decodeURIComponent(encodedScope);
             try {
                 const res = await fetch(`/api/services/${encodeURIComponent(label)}?scope=${encodeURIComponent(scope)}`);
                 const data = await res.json();
@@ -961,17 +965,23 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             }
         }
 
-        async function viewLog(path) {
+        async function viewLog(encodedPath, encodedLabel) {
+            const path = decodeURIComponent(encodedPath || '');
+            const label = decodeURIComponent(encodedLabel || '');
+
+            if (!path) {
+                document.getElementById('logModalTitle').innerText = `Service Log Viewer: ${label}`;
+                document.getElementById('logContent').innerText = `(No log file path [StandardOutPath / StandardErrorPath] configured for ${label})`;
+                document.getElementById('logModal').classList.add('active');
+                return;
+            }
+
             try {
                 const res = await fetch(`/api/logs?path=${encodeURIComponent(path)}&lines=200`);
                 const data = await res.json();
-                if (res.ok) {
-                    document.getElementById('logModalTitle').innerText = `Log Viewer: ${path}`;
-                    document.getElementById('logContent').innerText = data.content || '(Log file empty)';
-                    document.getElementById('logModal').classList.add('active');
-                } else {
-                    showToast(data.error || 'Log file not accessible', 'error');
-                }
+                document.getElementById('logModalTitle').innerText = `Log Viewer: ${path}`;
+                document.getElementById('logContent').innerText = data.content || '(Log file empty)';
+                document.getElementById('logModal').classList.add('active');
             } catch (err) {
                 showToast('Failed to fetch log file', 'error');
             }

@@ -306,8 +306,13 @@ pub async fn get_service_log(Query(query): Query<LogQuery>) -> impl IntoResponse
     let path = PathBuf::from(&query.path);
     if !path.exists() {
         return (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({ "error": format!("Log file not found: {}", query.path) })),
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "path": query.path,
+                "exists": false,
+                "total_lines": 0,
+                "content": format!("(Log file does not exist yet at: {})", query.path)
+            })),
         );
     }
 

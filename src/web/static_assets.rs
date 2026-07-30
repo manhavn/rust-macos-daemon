@@ -719,18 +719,19 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     <!-- Log Viewer Modal -->
     <div id="logModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-content" style="max-width: 1400px; width: 95vw; height: 94vh;">
             <div class="modal-header">
                 <h3 id="logModalTitle">Service Log Viewer</h3>
                 <button class="btn btn-secondary btn-sm" onclick="closeModal('logModal')">✕</button>
             </div>
-            <div class="modal-body">
-                <div id="logContent" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: #090d16; padding: 1rem; border-radius: 8px; border: 1px solid var(--card-border); max-height: 450px; overflow-y: auto; white-space: pre-wrap; color: #a7f3d0;"></div>
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; height: 100%; overflow: hidden;">
+                <div id="logContent" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; background: #090d16; padding: 1.25rem; border-radius: 8px; border: 1px solid var(--card-border); flex: 1; height: 100%; overflow-y: auto; white-space: pre-wrap; color: #a7f3d0; line-height: 1.5;"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('logModal')">Close</button>
             </div>
         </div>
+    </div>
     <!-- Root Info Modal -->
     <div id="rootModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 650px;">

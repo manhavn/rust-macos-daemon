@@ -517,7 +517,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             </div>
         </div>
         <div class="sys-status">
-            <div id="rootBadge" class="badge badge-user">
+            <div id="rootBadge" class="badge badge-user" style="cursor: pointer;" title="Click for Root / System Privileges info" onclick="openRootInfoModal()">
                 <span class="badge-pulse"></span>
                 <span id="rootBadgeText">User Mode</span>
             </div>
@@ -658,6 +658,29 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <button class="btn btn-secondary" onclick="closeModal('logModal')">Close</button>
             </div>
         </div>
+    <!-- Root Info Modal -->
+    <div id="rootModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3>🔐 Root / System Daemon Privileges</h3>
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('rootModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    System Daemons (tại <code>/Library/LaunchDaemons</code>) yêu cầu quyền <b>Root / Administrator</b> để lưu và điều khiển.
+                </p>
+                <div style="background: rgba(22, 30, 49, 0.9); padding: 1.2rem; border-radius: 10px; border: 1px solid var(--card-border);">
+                    <p style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--accent-cyan);">Cách 1: Chạy Web App trực tiếp bằng Root / Sudo (Tối ưu nhất cho Remote):</p>
+                    <code style="display: block; background: #090d16; padding: 0.6rem 0.85rem; border-radius: 6px; color: #a7f3d0; font-family: 'JetBrains Mono', monospace; font-size: 0.825rem; margin-bottom: 1.25rem;">sudo macdaemon web --host 0.0.0.0 --port 8990</code>
+                    
+                    <p style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--accent-cyan);">Cách 2: Tự động xin quyền (macOS Password Prompt):</p>
+                    <p style="font-size: 0.825rem; color: var(--text-secondary);">Khi chạy ở User Mode, nếu bạn thêm/sửa/xoá các dịch vụ System Daemon, ứng dụng sẽ tự động gọi hộp thoại xin quyền Administrator của macOS để thực thi.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('rootModal')">Đã Hiểu</button>
+            </div>
+        </div>
     </div>
 
     <div id="toastContainer" class="toast-container"></div>
@@ -670,6 +693,10 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
         async function init() {
             await fetchStatus();
             await fetchServices();
+        }
+
+        function openRootInfoModal() {
+            document.getElementById('rootModal').classList.add('active');
         }
 
         async function fetchStatus() {
@@ -757,7 +784,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                     statusBadge = '<span style="color: var(--accent-amber); font-weight:600;">● Loaded (Stopped)</span>';
                 }
 
-                const logPath = s.plist_data ? (s.plist_data.StandardOutPath || s.plist_data.StandardErrorPath || '') : '';
+                const cmd = s.plist_data && s.plist_data.ProgramArguments ? s.plist_data.ProgramArguments.join(' ') : (s.plist_data && s.plist_data.Program ? s.plist_data.Program : 'Unknown');
 
                 card.innerHTML = `
                     <div>
@@ -773,25 +800,25 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                     </div>
                     <div class="service-actions">
                         ${s.pid !== null ? 
-                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'stop')">Stop</button>` :
-                            `<button class="btn btn-primary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'start')">Start</button>`
+                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'stop')">Stop</button>` :
+                            `<button class="btn btn-primary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'start')">Start</button>`
                         }
                         ${s.is_loaded ? 
-                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'unload')">Unload</button>` :
-                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}', 'load')">Load</button>`
+                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'unload')">Unload</button>` :
+                            `<button class="btn btn-secondary btn-sm" onclick="triggerAction('${s.label}', '${s.scope}', 'load')">Load</button>`
                         }
-                        <button class="btn btn-secondary btn-sm" onclick="openEditModal('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}')">Edit</button>
-                        <button class="btn btn-secondary btn-sm" onclick="viewLog('${encodeURIComponent(logPath)}', '${encodeURIComponent(s.label)}')">Log</button>
-                        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${encodeURIComponent(s.label)}', '${encodeURIComponent(s.scope)}')">Delete</button>
+                        <button class="btn btn-secondary btn-sm" onclick="openEditModal('${s.label}', '${s.scope}')">Edit</button>
+                        ${s.plist_data && s.plist_data.StandardOutPath ? 
+                            `<button class="btn btn-secondary btn-sm" onclick="viewLog('${s.plist_data.StandardOutPath}')">Log</button>` : ''
+                        }
+                        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${s.label}', '${s.scope}')">Delete</button>
                     </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        async function triggerAction(encodedLabel, encodedScope, action) {
-            const label = decodeURIComponent(encodedLabel);
-            const scope = decodeURIComponent(encodedScope);
+        async function triggerAction(label, scope, action) {
             try {
                 const res = await fetch(`/api/services/${encodeURIComponent(label)}/action`, {
                     method: 'POST',
@@ -810,9 +837,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             }
         }
 
-        async function confirmDelete(encodedLabel, encodedScope) {
-            const label = decodeURIComponent(encodedLabel);
-            const scope = decodeURIComponent(encodedScope);
+        async function confirmDelete(label, scope) {
             if (confirm(`Are you sure you want to delete service "${label}"? This will unload and remove its plist file.`)) {
                 try {
                     const res = await fetch(`/api/services/${encodeURIComponent(label)}?scope=${encodeURIComponent(scope)}`, {
@@ -845,9 +870,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             document.getElementById('serviceModal').classList.add('active');
         }
 
-        async function openEditModal(encodedLabel, encodedScope) {
-            const label = decodeURIComponent(encodedLabel);
-            const scope = decodeURIComponent(encodedScope);
+        async function openEditModal(label, scope) {
             try {
                 const res = await fetch(`/api/services/${encodeURIComponent(label)}?scope=${encodeURIComponent(scope)}`);
                 const data = await res.json();
@@ -965,23 +988,17 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             }
         }
 
-        async function viewLog(encodedPath, encodedLabel) {
-            const path = decodeURIComponent(encodedPath || '');
-            const label = decodeURIComponent(encodedLabel || '');
-
-            if (!path) {
-                document.getElementById('logModalTitle').innerText = `Service Log Viewer: ${label}`;
-                document.getElementById('logContent').innerText = `(No log file path [StandardOutPath / StandardErrorPath] configured for ${label})`;
-                document.getElementById('logModal').classList.add('active');
-                return;
-            }
-
+        async function viewLog(path) {
             try {
                 const res = await fetch(`/api/logs?path=${encodeURIComponent(path)}&lines=200`);
                 const data = await res.json();
-                document.getElementById('logModalTitle').innerText = `Log Viewer: ${path}`;
-                document.getElementById('logContent').innerText = data.content || '(Log file empty)';
-                document.getElementById('logModal').classList.add('active');
+                if (res.ok) {
+                    document.getElementById('logModalTitle').innerText = `Log Viewer: ${path}`;
+                    document.getElementById('logContent').innerText = data.content || '(Log file empty)';
+                    document.getElementById('logModal').classList.add('active');
+                } else {
+                    showToast(data.error || 'Log file not accessible', 'error');
+                }
             } catch (err) {
                 showToast('Failed to fetch log file', 'error');
             }

@@ -51,8 +51,13 @@ impl std::str::FromStr for ServiceScope {
         match s.to_lowercase().as_str() {
             "user" | "u" => Ok(ServiceScope::User),
             "global" | "global-agent" | "global_agent" | "g" => Ok(ServiceScope::GlobalAgent),
-            "system" | "system-daemon" | "system_daemon" | "sys" | "s" | "root" => Ok(ServiceScope::SystemDaemon),
-            _ => Err(anyhow::anyhow!("Unknown scope: '{}'. Valid scopes: user, global, system", s)),
+            "system" | "system-daemon" | "system_daemon" | "sys" | "s" | "root" => {
+                Ok(ServiceScope::SystemDaemon)
+            }
+            _ => Err(anyhow::anyhow!(
+                "Unknown scope: '{}'. Valid scopes: user, global, system (system_daemon)",
+                s
+            )),
         }
     }
 }
@@ -62,7 +67,7 @@ impl std::str::FromStr for ServiceScope {
 #[serde(rename_all = "PascalCase")]
 pub struct LaunchdPlist {
     pub label: String,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub program: Option<String>,
 

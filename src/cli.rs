@@ -178,11 +178,7 @@ pub enum Commands {
 #[derive(Debug)]
 pub enum CliAction {
     Executed,
-    StartWeb {
-        host: String,
-        port: u16,
-        open: bool,
-    },
+    StartWeb { host: String, port: u16, open: bool },
 }
 
 pub fn handle_cli(cli: Cli) -> Result<CliAction> {
@@ -199,7 +195,10 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
 
     match command {
         Commands::List { scope, json } => {
-            let filter_scope = scope.as_deref().map(|s| s.parse::<ServiceScope>()).transpose()?;
+            let filter_scope = scope
+                .as_deref()
+                .map(|s| s.parse::<ServiceScope>())
+                .transpose()?;
             let items = LaunchdManager::list_services(filter_scope)?;
 
             if json {
@@ -209,7 +208,10 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
                 if is_root() {
                     println!("{}", "Running as ROOT (Full System Access)".bold().green());
                 } else {
-                    println!("{}", "Running as User (System Daemons may require sudo)".yellow());
+                    println!(
+                        "{}",
+                        "Running as User (System Daemons may require sudo)".yellow()
+                    );
                 }
                 println!();
 
@@ -244,11 +246,19 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
         }
 
         Commands::Info { label, scope } => {
-            let filter_scope = scope.as_deref().map(|s| s.parse::<ServiceScope>()).transpose()?;
+            let filter_scope = scope
+                .as_deref()
+                .map(|s| s.parse::<ServiceScope>())
+                .transpose()?;
             let item = LaunchdManager::find_service(&label, filter_scope)?
                 .ok_or_else(|| anyhow!("Service '{}' not found", label))?;
 
-            println!("{}", format!("=== Service Info: {} ===", item.label).bold().cyan());
+            println!(
+                "{}",
+                format!("=== Service Info: {} ===", item.label)
+                    .bold()
+                    .cyan()
+            );
             println!("Scope:         {:?}", item.scope);
             println!("Plist Path:    {}", item.plist_path.display());
             println!("Is Loaded:     {}", item.is_loaded);
@@ -294,20 +304,34 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
             plist::to_writer_xml(&mut xml_bytes, &plist_obj)?;
             let xml_str = String::from_utf8(xml_bytes)?;
 
-            println!("Registering service '{}' in {}...", label.bold(), parsed_scope);
+            println!(
+                "Registering service '{}' in {}...",
+                label.bold(),
+                parsed_scope
+            );
             write_file_elevated(&plist_path, &xml_str, parsed_scope.requires_root())?;
-            println!("{} Created plist at {}", "SUCCESS".green().bold(), plist_path.display());
+            println!(
+                "{} Created plist at {}",
+                "SUCCESS".green().bold(),
+                plist_path.display()
+            );
 
             println!("Loading service via launchctl...");
             match LaunchdManager::load_service(parsed_scope, &plist_path) {
                 Ok(_) => println!("{} Service loaded and running!", "SUCCESS".green().bold()),
-                Err(e) => println!("{} Service created but load warning: {}", "WARNING".yellow(), e),
+                Err(e) => println!(
+                    "{} Service created but load warning: {}",
+                    "WARNING".yellow(),
+                    e
+                ),
             }
         }
 
         Commands::Remove { label, scope } => {
             let parsed_scope: ServiceScope = scope.parse()?;
-            let plist_path = parsed_scope.directory_path().join(format!("{}.plist", label));
+            let plist_path = parsed_scope
+                .directory_path()
+                .join(format!("{}.plist", label));
 
             println!("Unloading service '{}'...", label.bold());
             let _ = LaunchdManager::unload_service(parsed_scope, &plist_path, &label);
@@ -323,7 +347,11 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
                 .ok_or_else(|| anyhow!("Service '{}' not found", label))?;
 
             LaunchdManager::load_service(parsed_scope, &item.plist_path)?;
-            println!("{} Service '{}' loaded successfully", "SUCCESS".green().bold(), label);
+            println!(
+                "{} Service '{}' loaded successfully",
+                "SUCCESS".green().bold(),
+                label
+            );
         }
 
         Commands::Unload { label, scope } => {
@@ -332,7 +360,11 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
                 .ok_or_else(|| anyhow!("Service '{}' not found", label))?;
 
             LaunchdManager::unload_service(parsed_scope, &item.plist_path, &label)?;
-            println!("{} Service '{}' unloaded successfully", "SUCCESS".green().bold(), label);
+            println!(
+                "{} Service '{}' unloaded successfully",
+                "SUCCESS".green().bold(),
+                label
+            );
         }
 
         Commands::Enable { label, scope } => {
@@ -378,7 +410,11 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
                 let edited_xml = std::fs::read_to_string(&temp_file)?;
                 write_raw_xml(&temp_file, &edited_xml)?; // Validate syntax
                 write_file_elevated(&item.plist_path, &edited_xml, parsed_scope.requires_root())?;
-                println!("{} Updated raw plist for '{}'", "SUCCESS".green().bold(), label);
+                println!(
+                    "{} Updated raw plist for '{}'",
+                    "SUCCESS".green().bold(),
+                    label
+                );
             }
             let _ = std::fs::remove_file(&temp_file);
         }

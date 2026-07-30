@@ -18,18 +18,14 @@ pub fn current_user_name() -> String {
 /// Execute command with elevation if required
 pub fn run_command(command: &str, args: &[&str], require_root: bool) -> Result<Output> {
     if !require_root || is_root() {
-        let output = Command::new(command)
-            .args(args)
-            .output()?;
+        let output = Command::new(command).args(args).output()?;
         Ok(output)
     } else {
         // Try sudo first
         let mut sudo_args = vec![command];
         sudo_args.extend(args.iter().cloned());
 
-        let output = Command::new("sudo")
-            .args(&sudo_args)
-            .output();
+        let output = Command::new("sudo").args(&sudo_args).output();
 
         match output {
             Ok(out) if out.status.success() => Ok(out),
@@ -59,7 +55,11 @@ pub fn run_command(command: &str, args: &[&str], require_root: bool) -> Result<O
 }
 
 /// Write file with privilege escalation if necessary
-pub fn write_file_elevated(path: &std::path::Path, content: &str, require_root: bool) -> Result<()> {
+pub fn write_file_elevated(
+    path: &std::path::Path,
+    content: &str,
+    require_root: bool,
+) -> Result<()> {
     if !require_root || is_root() {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -75,18 +75,29 @@ pub fn write_file_elevated(path: &std::path::Path, content: &str, require_root: 
         let dest_str = path.to_string_lossy();
         let temp_str = temp_path.to_string_lossy();
 
-        let parent_str = path.parent().map(|p| p.to_string_lossy()).unwrap_or_default();
+        let parent_str = path
+            .parent()
+            .map(|p| p.to_string_lossy())
+            .unwrap_or_default();
         let mkdir_out = run_command("mkdir", &["-p", &parent_str], true)?;
         if !mkdir_out.status.success() {
             let _ = std::fs::remove_file(&temp_path);
-            return Err(anyhow!("Failed to create directory {}: {}", parent_str, String::from_utf8_lossy(&mkdir_out.stderr)));
+            return Err(anyhow!(
+                "Failed to create directory {}: {}",
+                parent_str,
+                String::from_utf8_lossy(&mkdir_out.stderr)
+            ));
         }
 
         let mv_out = run_command("mv", &[&temp_str, &dest_str], true)?;
         let _ = std::fs::remove_file(&temp_path);
 
         if !mv_out.status.success() {
-            return Err(anyhow!("Failed to move file to {}: {}", dest_str, String::from_utf8_lossy(&mv_out.stderr)));
+            return Err(anyhow!(
+                "Failed to move file to {}: {}",
+                dest_str,
+                String::from_utf8_lossy(&mv_out.stderr)
+            ));
         }
 
         // Set proper permissions for system daemons (root:wheel 644)
@@ -112,7 +123,11 @@ pub fn remove_file_elevated(path: &std::path::Path, require_root: bool) -> Resul
         let dest_str = path.to_string_lossy();
         let rm_out = run_command("rm", &["-f", &dest_str], true)?;
         if !rm_out.status.success() {
-            return Err(anyhow!("Failed to remove file {}: {}", dest_str, String::from_utf8_lossy(&rm_out.stderr)));
+            return Err(anyhow!(
+                "Failed to remove file {}: {}",
+                dest_str,
+                String::from_utf8_lossy(&rm_out.stderr)
+            ));
         }
         Ok(())
     }

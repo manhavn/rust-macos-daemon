@@ -43,7 +43,10 @@ pub async fn list_services(Query(query): Query<ListServicesQuery>) -> impl IntoR
 
     match scope_filter {
         Ok(filter) => match LaunchdManager::list_services(filter) {
-            Ok(items) => (StatusCode::OK, Json(serde_json::json!({ "services": items }))),
+            Ok(items) => (
+                StatusCode::OK,
+                Json(serde_json::json!({ "services": items })),
+            ),
             Err(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({ "error": e.to_string() })),
@@ -79,7 +82,12 @@ pub async fn get_service_detail(
 
     let scope = match scope_filter {
         Ok(s) => s,
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        }
     };
 
     match LaunchdManager::find_service(&label, scope) {
@@ -116,12 +124,15 @@ pub struct CreateServiceRequest {
     pub env: Option<HashMap<String, String>>,
 }
 
-pub async fn create_or_update_service(
-    Json(req): Json<CreateServiceRequest>,
-) -> impl IntoResponse {
+pub async fn create_or_update_service(Json(req): Json<CreateServiceRequest>) -> impl IntoResponse {
     let scope: ServiceScope = match req.scope.parse() {
         Ok(s) => s,
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        }
     };
 
     let target_dir = scope.directory_path();
@@ -186,7 +197,12 @@ pub struct SaveRawServiceRequest {
 pub async fn save_raw_service(Json(req): Json<SaveRawServiceRequest>) -> impl IntoResponse {
     let scope: ServiceScope = match req.scope.parse() {
         Ok(s) => s,
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        }
     };
 
     if let Err(e) = validate_raw_xml(&req.xml_content) {
@@ -230,7 +246,12 @@ pub async fn delete_service(
 ) -> impl IntoResponse {
     let scope: ServiceScope = match query.scope.parse() {
         Ok(s) => s,
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        }
     };
 
     let plist_path = scope.directory_path().join(format!("{}.plist", label));
@@ -262,7 +283,12 @@ pub async fn service_action(
 ) -> impl IntoResponse {
     let scope: ServiceScope = match req.scope.parse() {
         Ok(s) => s,
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        }
     };
 
     let plist_path = scope.directory_path().join(format!("{}.plist", label));
@@ -306,13 +332,8 @@ pub async fn get_service_log(Query(query): Query<LogQuery>) -> impl IntoResponse
     let path = PathBuf::from(&query.path);
     if !path.exists() {
         return (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "path": query.path,
-                "exists": false,
-                "total_lines": 0,
-                "content": format!("(Log file does not exist yet at: {})", query.path)
-            })),
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": format!("Log file not found: {}", query.path) })),
         );
     }
 

@@ -36,7 +36,14 @@ pub async fn start_web_server(host: &str, port: u16, open_browser: bool) -> anyh
 
     let url = format!("http://{}", addr_str);
     println!("🚀 Web UI running at {}", url);
-    println!("   Privilege Level: {}", if crate::privilege::is_root() { "ROOT (Elevated)" } else { "User Mode" });
+    println!(
+        "   Privilege Level: {}",
+        if crate::privilege::is_root() {
+            "ROOT (Elevated)"
+        } else {
+            "User Mode"
+        }
+    );
 
     if open_browser {
         let _ = open::that(&url);

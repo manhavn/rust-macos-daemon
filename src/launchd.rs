@@ -93,13 +93,13 @@ impl LaunchdManager {
                                 .into_owned()
                         });
 
-                    let (pid, last_exit_status) = launchctl_map
-                        .get(&label)
-                        .cloned()
-                        .unwrap_or((None, None));
+                    let (pid, last_exit_status) =
+                        launchctl_map.get(&label).cloned().unwrap_or((None, None));
 
                     let is_loaded = launchctl_map.contains_key(&label);
-                    let is_enabled = plist_data.as_ref().map_or(true, |p| p.disabled != Some(true));
+                    let is_enabled = plist_data
+                        .as_ref()
+                        .map_or(true, |p| p.disabled != Some(true));
 
                     items.push(DaemonItem {
                         label,
@@ -141,7 +141,11 @@ impl LaunchdManager {
         let load_out = run_command("launchctl", &["load", "-w", &path_str], req_root)?;
         if !load_out.status.success() {
             let err = String::from_utf8_lossy(&load_out.stderr);
-            return Err(anyhow::anyhow!("Failed to load service {}: {}", path_str, err));
+            return Err(anyhow::anyhow!(
+                "Failed to load service {}: {}",
+                path_str,
+                err
+            ));
         }
 
         Ok(())
@@ -164,7 +168,11 @@ impl LaunchdManager {
         let unload_out = run_command("launchctl", &["unload", "-w", &path_str], req_root)?;
         if !unload_out.status.success() {
             let err = String::from_utf8_lossy(&unload_out.stderr);
-            return Err(anyhow::anyhow!("Failed to unload service {}: {}", label, err));
+            return Err(anyhow::anyhow!(
+                "Failed to unload service {}: {}",
+                label,
+                err
+            ));
         }
 
         Ok(())
@@ -179,7 +187,11 @@ impl LaunchdManager {
         let out = run_command("launchctl", &["enable", &service_target], req_root)?;
         if !out.status.success() {
             let err = String::from_utf8_lossy(&out.stderr);
-            return Err(anyhow::anyhow!("Failed to enable service {}: {}", label, err));
+            return Err(anyhow::anyhow!(
+                "Failed to enable service {}: {}",
+                label,
+                err
+            ));
         }
 
         Ok(())
@@ -194,7 +206,11 @@ impl LaunchdManager {
         let out = run_command("launchctl", &["disable", &service_target], req_root)?;
         if !out.status.success() {
             let err = String::from_utf8_lossy(&out.stderr);
-            return Err(anyhow::anyhow!("Failed to disable service {}: {}", label, err));
+            return Err(anyhow::anyhow!(
+                "Failed to disable service {}: {}",
+                label,
+                err
+            ));
         }
 
         Ok(())
@@ -216,7 +232,11 @@ impl LaunchdManager {
         let legacy_out = run_command("launchctl", &["start", label], req_root)?;
         if !legacy_out.status.success() {
             let err = String::from_utf8_lossy(&legacy_out.stderr);
-            return Err(anyhow::anyhow!("Failed to start service {}: {}", label, err));
+            return Err(anyhow::anyhow!(
+                "Failed to start service {}: {}",
+                label,
+                err
+            ));
         }
 
         Ok(())

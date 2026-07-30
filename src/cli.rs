@@ -170,7 +170,7 @@ pub enum Commands {
         port: u16,
 
         /// Open web app in default browser
-        #[arg(long, default_value_t = true)]
+        #[arg(long, default_value_t = false)]
         open: bool,
     },
 }
@@ -188,7 +188,7 @@ pub fn handle_cli(cli: Cli) -> Result<CliAction> {
             return Ok(CliAction::StartWeb {
                 host: "127.0.0.1".to_string(),
                 port: 8990,
-                open: true,
+                open: false,
             })
         }
     };

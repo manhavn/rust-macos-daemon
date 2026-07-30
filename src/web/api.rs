@@ -363,3 +363,353 @@ pub async fn get_service_log(Query(query): Query<LogQuery>) -> impl IntoResponse
         ),
     }
 }
+
+#[derive(Deserialize)]
+pub struct ReadFileQuery {
+    pub path: String,
+}
+
+pub async fn read_raw_file(Query(query): Query<ReadFileQuery>) -> impl IntoResponse {
+    let path = PathBuf::from(&query.path);
+    let exists = path.exists();
+
+    if !exists {
+        return (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "path": query.path,
+                "exists": false,
+                "content": "",
+                "requires_root": query.path.starts_with("/Library") || query.path.starts_with("/etc") || query.path.starts_with("/System") || query.path.starts_with("/var")
+            })),
+        );
+    }
+
+    match std::fs::read_to_string(&path) {
+        Ok(content) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "path": query.path,
+                "exists": true,
+                "content": content,
+                "requires_root": query.path.starts_with("/Library") || query.path.starts_with("/etc") || query.path.starts_with("/System") || query.path.starts_with("/var")
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(
+                serde_json::json!({ "error": format!("Failed to read file '{}': {}", query.path, e) }),
+            ),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SaveFileRequest {
+    pub path: String,
+    pub content: String,
+    pub require_root: Option<bool>,
+}
+
+pub async fn save_raw_file(Json(req): Json<SaveFileRequest>) -> impl IntoResponse {
+    let path = PathBuf::from(&req.path);
+    let require_root = req.require_root.unwrap_or_else(|| {
+        req.path.starts_with("/Library")
+            || req.path.starts_with("/etc")
+            || req.path.starts_with("/System")
+            || req.path.starts_with("/var")
+    });
+
+    match write_file_elevated(&path, &req.content, require_root) {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "message": format!("File '{}' saved successfully", req.path),
+                "path": req.path
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("Failed to save file: {}", e) })),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct PermissionRequest {
+    pub path: String,
+    pub action: String,
+    pub value: Option<String>,
+    pub require_root: Option<bool>,
+}
+
+pub async fn manage_permissions(Json(req): Json<PermissionRequest>) -> impl IntoResponse {
+    let path = PathBuf::from(&req.path);
+    let require_root = req.require_root.unwrap_or_else(|| {
+        req.path.starts_with("/Library")
+            || req.path.starts_with("/etc")
+            || req.path.starts_with("/System")
+            || req.path.starts_with("/var")
+    });
+
+    match req.action.to_lowercase().as_str() {
+        "load" => {
+            if !path.exists() {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(
+                        serde_json::json!({ "error": format!("Path '{}' does not exist", req.path) }),
+                    ),
+                );
+            }
+
+            let out = match std::process::Command::new("ls")
+                .args(&["-ld", &req.path])
+                .output()
+            {
+                Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
+                Err(e) => format!("Error: {}", e),
+            };
+
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+            let chmod_mode = match std::fs::metadata(&req.path) {
+                Ok(m) => format!("{:o}", m.permissions().mode() & 0o777),
+                Err(_) => "".to_string(),
+            };
+
+            let chown_val = match std::fs::metadata(&req.path) {
+                Ok(m) => {
+                    let uid = m.uid();
+                    let gid = m.gid();
+                    let u = users::get_user_by_uid(uid)
+                        .map(|u| u.name().to_string_lossy().into_owned())
+                        .unwrap_or_else(|| uid.to_string());
+                    let g = users::get_group_by_gid(gid)
+                        .map(|g| g.name().to_string_lossy().into_owned())
+                        .unwrap_or_else(|| gid.to_string());
+                    format!("{}:{}", u, g)
+                }
+                Err(_) => "".to_string(),
+            };
+
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "path": req.path,
+                    "info": out.trim(),
+                    "chmod": chmod_mode,
+                    "chown": chown_val,
+                    "requires_root": require_root
+                })),
+            )
+        }
+        "chmod" => {
+            let mode = match req.value {
+                Some(ref m) if !m.trim().is_empty() => m.trim().to_string(),
+                _ => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(
+                            serde_json::json!({ "error": "Chmod permissions value required (e.g. 755)" }),
+                        ),
+                    )
+                }
+            };
+
+            match crate::privilege::run_command("chmod", &[&mode, &req.path], require_root) {
+                Ok(out) if out.status.success() => (
+                    StatusCode::OK,
+                    Json(
+                        serde_json::json!({ "message": format!("Chmod {} applied to '{}'", mode, req.path) }),
+                    ),
+                ),
+                Ok(out) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        serde_json::json!({ "error": format!("Chmod failed: {}", String::from_utf8_lossy(&out.stderr)) }),
+                    ),
+                ),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                ),
+            }
+        }
+        "chown" => {
+            let owner = match req.value {
+                Some(ref o) if !o.trim().is_empty() => o.trim().to_string(),
+                _ => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(
+                            serde_json::json!({ "error": "Chown owner:group value required (e.g. root:wheel)" }),
+                        ),
+                    )
+                }
+            };
+
+            match crate::privilege::run_command("chown", &[&owner, &req.path], require_root) {
+                Ok(out) if out.status.success() => (
+                    StatusCode::OK,
+                    Json(
+                        serde_json::json!({ "message": format!("Chown {} applied to '{}'", owner, req.path) }),
+                    ),
+                ),
+                Ok(out) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        serde_json::json!({ "error": format!("Chown failed: {}", String::from_utf8_lossy(&out.stderr)) }),
+                    ),
+                ),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                ),
+            }
+        }
+        _ => (
+            StatusCode::BAD_REQUEST,
+            Json(
+                serde_json::json!({ "error": format!("Unknown permission action '{}'", req.action) }),
+            ),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CopyRequest {
+    pub src: String,
+    pub dest: String,
+    pub require_root: Option<bool>,
+}
+
+pub async fn copy_path(Json(req): Json<CopyRequest>) -> impl IntoResponse {
+    let src_path = PathBuf::from(&req.src);
+    if !src_path.exists() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(
+                serde_json::json!({ "error": format!("Source path '{}' does not exist", req.src) }),
+            ),
+        );
+    }
+
+    let require_root = req.require_root.unwrap_or_else(|| {
+        req.src.starts_with("/Library")
+            || req.dest.starts_with("/Library")
+            || req.src.starts_with("/etc")
+            || req.dest.starts_with("/etc")
+            || req.src.starts_with("/System")
+            || req.dest.starts_with("/System")
+            || req.src.starts_with("/var")
+            || req.dest.starts_with("/var")
+    });
+
+    match crate::privilege::run_command("cp", &["-R", &req.src, &req.dest], require_root) {
+        Ok(out) if out.status.success() => (
+            StatusCode::OK,
+            Json(
+                serde_json::json!({ "message": format!("Successfully copied '{}' to '{}'", req.src, req.dest) }),
+            ),
+        ),
+        Ok(out) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(
+                serde_json::json!({ "error": format!("Copy failed: {}", String::from_utf8_lossy(&out.stderr)) }),
+            ),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct DeletePathRequest {
+    pub path: String,
+    pub require_root: Option<bool>,
+}
+
+pub async fn delete_path(Json(req): Json<DeletePathRequest>) -> impl IntoResponse {
+    let path = PathBuf::from(&req.path);
+    if !path.exists() {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": format!("Path '{}' does not exist", req.path) })),
+        );
+    }
+
+    let require_root = req.require_root.unwrap_or_else(|| {
+        req.path.starts_with("/Library")
+            || req.path.starts_with("/etc")
+            || req.path.starts_with("/System")
+            || req.path.starts_with("/var")
+    });
+
+    match crate::privilege::run_command("rm", &["-rf", &req.path], require_root) {
+        Ok(out) if out.status.success() => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "message": format!("Successfully deleted '{}'", req.path) })),
+        ),
+        Ok(out) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(
+                serde_json::json!({ "error": format!("Delete failed: {}", String::from_utf8_lossy(&out.stderr)) }),
+            ),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct MoveRequest {
+    pub src: String,
+    pub dest: String,
+    pub require_root: Option<bool>,
+}
+
+pub async fn move_path(Json(req): Json<MoveRequest>) -> impl IntoResponse {
+    let src_path = PathBuf::from(&req.src);
+    if !src_path.exists() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(
+                serde_json::json!({ "error": format!("Source path '{}' does not exist", req.src) }),
+            ),
+        );
+    }
+
+    let require_root = req.require_root.unwrap_or_else(|| {
+        req.src.starts_with("/Library")
+            || req.dest.starts_with("/Library")
+            || req.src.starts_with("/etc")
+            || req.dest.starts_with("/etc")
+            || req.src.starts_with("/System")
+            || req.dest.starts_with("/System")
+            || req.src.starts_with("/var")
+            || req.dest.starts_with("/var")
+    });
+
+    match crate::privilege::run_command("mv", &[&req.src, &req.dest], require_root) {
+        Ok(out) if out.status.success() => (
+            StatusCode::OK,
+            Json(
+                serde_json::json!({ "message": format!("Successfully moved '{}' to '{}'", req.src, req.dest) }),
+            ),
+        ),
+        Ok(out) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(
+                serde_json::json!({ "error": format!("Move failed: {}", String::from_utf8_lossy(&out.stderr)) }),
+            ),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ),
+    }
+}

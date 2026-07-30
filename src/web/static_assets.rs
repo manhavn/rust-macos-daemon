@@ -391,6 +391,11 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             overflow: hidden;
         }
 
+        .modal-content.modal-compact {
+            height: auto !important;
+            max-height: 85vh !important;
+        }
+
         .modal-header {
             padding: 1.25rem 1.5rem;
             border-bottom: 1px solid var(--card-border);
@@ -595,6 +600,8 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <span id="rootBadgeText">User Mode</span>
             </div>
             <button class="btn btn-secondary btn-sm" onclick="fetchServices()">⚡ Refresh</button>
+            <button class="btn btn-secondary btn-sm" onclick="openRawFileModal()">📝 Edit File</button>
+            <button class="btn btn-secondary btn-sm" onclick="openFileToolsModal()">🛠 File Tools</button>
             <button class="btn btn-primary" onclick="openCreateModal()">+ Add Service</button>
         </div>
     </nav>
@@ -706,7 +713,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <div id="rawTabContent" style="display: none;">
                     <div class="form-group">
                         <label>Plist XML Content (Strict Plist DTD Format)</label>
-                        <textarea id="rawXmlArea" class="form-control"></textarea>
+                        <textarea id="rawXmlArea" class="form-control" placeholder='<?xml version="1.0" encoding="UTF-8"?>&#10;<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">&#10;<plist version="1.0">&#10;<dict>&#10;&#9;<key>Label</key>&#10;&#9;<string>com.user.myservice</string>&#10;&#9;<key>ProgramArguments</key>&#10;&#9;<array>&#10;&#9;&#9;<string>/bin/echo</string>&#10;&#9;&#9;<string>Hello World</string>&#10;&#9;</array>&#10;&#9;<key>RunAtLoad</key>&#10;&#9;<true/>&#10;</dict>&#10;</plist>'></textarea>
                     </div>
                 </div>
             </div>
@@ -734,7 +741,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
     </div>
     <!-- Root Info Modal -->
     <div id="rootModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-content modal-compact" style="max-width: 650px; height: auto; max-height: 85vh;">
             <div class="modal-header">
                 <h3>🔐 Root / System Daemon Privileges</h3>
                 <button class="btn btn-secondary btn-sm" onclick="closeModal('rootModal')">✕</button>
@@ -756,6 +763,186 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             </div>
         </div>
     </div>
+    <!-- Raw Arbitrary File Editor Modal -->
+    <div id="rawFileModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 1400px; width: 95vw; height: 94vh;">
+            <div class="modal-header">
+                <h3>📝 Raw Arbitrary File Editor</h3>
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('rawFileModal')">✕</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; height: 100%; gap: 1rem; overflow: hidden;">
+                <div class="form-row" style="align-items: flex-end; grid-template-columns: 1fr auto auto;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>File Absolute Path</label>
+                        <input type="text" id="rawFilePathInput" class="form-control" placeholder="/tmp/test-file.txt" onkeydown="if(event.key==='Enter') fetchRawFile()">
+                    </div>
+                    <button class="btn btn-primary" onclick="fetchRawFile()">📂 Load File</button>
+                    <label class="form-check" style="margin-bottom: 0.5rem; margin-left: 0.5rem;">
+                        <input type="checkbox" id="rawFileRootCheck">
+                        Save as Root (Sudo)
+                    </label>
+                </div>
+                <div class="form-group" style="flex: 1; height: 100%; display: flex; flex-direction: column;">
+                    <label id="rawFileStatusLabel">File Path Content</label>
+                    <textarea id="rawFileContentTextarea" class="form-control" placeholder="Enter file content here..." style="font-family: 'JetBrains Mono', monospace; min-height: 400px; flex: 1; height: 100%; resize: vertical; line-height: 1.5; background: #090d16; color: #a7f3d0; padding: 1.25rem;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('rawFileModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveRawFile()">💾 Save File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File & Directory Management Tools Modal -->
+    <div id="fileToolsModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 1200px; width: 92vw; height: 92vh;">
+            <div class="modal-header">
+                <h3>🛠 File & Folder Management Tools</h3>
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('fileToolsModal')">✕</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.75rem; overflow-y: auto; padding: 1.5rem;">
+                
+                <!-- TOP SECTION: Chown & Chmod -->
+                <div style="background: rgba(22, 30, 49, 0.7); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+                    <h4 style="color: var(--accent-cyan); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                        🔐 Permissions & Ownership (Chown / Chmod)
+                    </h4>
+
+                    <div class="form-row" style="align-items: flex-end; grid-template-columns: 1fr auto auto;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Target File / Folder Path</label>
+                            <input type="text" id="toolsPermPathInput" class="form-control" placeholder="/tmp/myfolder" onkeydown="if(event.key==='Enter') loadPermInfo()">
+                        </div>
+                        <button class="btn btn-secondary" onclick="loadPermInfo()">📂 Load Info</button>
+                        <label class="form-check" style="margin-bottom: 0.5rem; margin-left: 0.5rem;">
+                            <input type="checkbox" id="toolsPermRootCheck">
+                            Root (Sudo)
+                        </label>
+                    </div>
+
+                    <div id="toolsPermInfoBox" style="display: none; background: #090d16; padding: 0.75rem 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #a7f3d0; border: 1px solid var(--card-border);"></div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Chown Owner:Group (e.g. root:wheel or dev:staff)</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="toolsChownInput" class="form-control" placeholder="root:wheel" style="flex: 1;">
+                                <button class="btn btn-primary" onclick="setChown()">Set Chown</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Chmod Mode (e.g. 755 or 644)</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="toolsChmodInput" class="form-control" placeholder="755" style="flex: 1;">
+                                <button class="btn btn-primary" onclick="setChmod()">Set Chmod</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MIDDLE SECTION: Copy File / Directory -->
+                <div style="background: rgba(22, 30, 49, 0.7); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+                    <h4 style="color: var(--accent-blue); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                        📋 Copy File / Directory
+                    </h4>
+
+                    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+                        <div class="form-group">
+                            <label>Source File / Folder Path</label>
+                            <input type="text" id="toolsCopySrcInput" class="form-control" placeholder="/path/to/source.txt">
+                        </div>
+                        <div class="form-group">
+                            <label>Destination Path / New File Name</label>
+                            <input type="text" id="toolsCopyDestInput" class="form-control" placeholder="/path/to/destination.txt">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label class="form-check">
+                            <input type="checkbox" id="toolsCopyRootCheck">
+                            Copy with Root (Sudo) privileges
+                        </label>
+                        <button class="btn btn-primary" onclick="executeCopy()">📋 Copy File / Folder</button>
+                    </div>
+                </div>
+
+                <!-- MOVE SECTION: Move File / Directory -->
+                <div style="background: rgba(22, 30, 49, 0.7); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+                    <h4 style="color: var(--accent-purple); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                        🚚 Move File / Directory
+                    </h4>
+
+                    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+                        <div class="form-group">
+                            <label>Source File / Folder Path</label>
+                            <input type="text" id="toolsMoveSrcInput" class="form-control" placeholder="/path/to/source.txt">
+                        </div>
+                        <div class="form-group">
+                            <label>Destination Path / Target Path</label>
+                            <input type="text" id="toolsMoveDestInput" class="form-control" placeholder="/path/to/destination.txt">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label class="form-check">
+                            <input type="checkbox" id="toolsMoveRootCheck">
+                            Move with Root (Sudo) privileges
+                        </label>
+                        <button class="btn btn-primary" onclick="executeMove()">🚚 Move File / Folder</button>
+                    </div>
+                </div>
+
+                <!-- BOTTOM SECTION: Delete File / Directory -->
+                <div style="background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+                    <h4 style="color: #fda4af; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                        🗑 Delete File / Directory (Bottom Section)
+                    </h4>
+
+                    <div class="form-row" style="align-items: flex-end; grid-template-columns: 1fr auto auto;">
+                        <div class="form-group" style="flex: 1;">
+                            <label style="color: #fda4af;">Target Path to Delete (File or Directory)</label>
+                            <input type="text" id="toolsDeletePathInput" class="form-control" placeholder="/tmp/old_file_or_dir" style="border-color: rgba(244, 63, 94, 0.4);">
+                        </div>
+                        <label class="form-check" style="margin-bottom: 0.5rem;">
+                            <input type="checkbox" id="toolsDeleteRootCheck">
+                            Delete as Root (Sudo)
+                        </label>
+                        <button class="btn btn-danger" onclick="executeDelete()">🗑 Delete File / Folder</button>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('fileToolsModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal with Countdown & Auto-Backup -->
+    <div id="confirmActionModal" class="modal-overlay">
+        <div class="modal-content modal-compact" style="max-width: 540px; height: auto; max-height: 85vh; border-radius: 14px; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);">
+            <div class="modal-header" style="padding: 1rem 1.25rem;">
+                <h3 id="confirmModalTitle" style="font-size: 1.05rem;">⚠️ Confirm Operation</h3>
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('confirmActionModal')">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 1.25rem; flex: initial; height: auto; gap: 0.85rem;">
+                <div id="confirmModalBadge" class="badge badge-user" style="display: inline-flex; align-self: flex-start;">
+                    <span id="confirmModalBadgeText">User Mode (3s Wait)</span>
+                </div>
+                <p id="confirmModalText" style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.5; margin: 0;"></p>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); background: #090d16; padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--card-border); margin: 0;">
+                    📦 <b>Auto Pre-Backup:</b> Safe copy download triggers automatically before change/deletion.
+                </p>
+            </div>
+            <div class="modal-footer" style="padding: 0.85rem 1.25rem;">
+                <button class="btn btn-secondary" onclick="closeModal('confirmActionModal')">Cancel</button>
+                <button id="confirmModalAcceptBtn" class="btn btn-primary" disabled onclick="onConfirmAcceptClick()">
+                    Confirm (3s)...
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div id="toastContainer" class="toast-container"></div>
 
@@ -767,6 +954,431 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
         async function init() {
             await fetchStatus();
             await fetchServices();
+        }
+
+        function openFileToolsModal() {
+            const modal = document.getElementById('fileToolsModal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function generateBackupFilename(filePath) {
+            if (!filePath) return `backup-${Date.now()}.txt`;
+
+            let lastSlashIndex = filePath.lastIndexOf('/');
+            let dir = '';
+            let fileName = filePath;
+            if (lastSlashIndex !== -1) {
+                dir = filePath.substring(0, lastSlashIndex);
+                fileName = filePath.substring(lastSlashIndex + 1);
+            }
+
+            let cleanDir = dir.replace(/\//g, '-');
+            if (cleanDir.startsWith('-')) cleanDir = cleanDir.substring(1);
+            if (cleanDir.endsWith('-')) cleanDir = cleanDir.substring(0, cleanDir.length - 1);
+
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const timeStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+
+            if (cleanDir) {
+                return `${cleanDir}-${timeStr}-${fileName}`;
+            } else {
+                return `${timeStr}-${fileName}`;
+            }
+        }
+
+        async function downloadBackupIfPossible(filePath) {
+            if (!filePath) return;
+            try {
+                const res = await fetch(`/api/file/read?path=${encodeURIComponent(filePath)}`);
+                const data = await res.json();
+                if (res.ok && data.exists && data.content !== undefined) {
+                    const backupName = generateBackupFilename(filePath);
+                    const blob = new Blob([data.content], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = backupName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast(`Downloaded backup '${backupName}'`, 'info');
+                }
+            } catch (err) {
+                console.log('Pre-backup download skipped or failed:', err);
+            }
+        }
+
+        let currentConfirmCallback = null;
+        let confirmTimerId = null;
+
+        function requestActionConfirmation({ title, message, isSudo, backupPath, onAccept }) {
+            const modal = document.getElementById('confirmActionModal');
+            document.getElementById('confirmModalTitle').innerText = title || '⚠️ Confirm Operation';
+            document.getElementById('confirmModalText').innerText = message || 'Are you sure you want to proceed?';
+
+            const badge = document.getElementById('confirmModalBadge');
+            const badgeText = document.getElementById('confirmModalBadgeText');
+            const btn = document.getElementById('confirmModalAcceptBtn');
+
+            let countdown = isSudo ? 5 : 3;
+            if (isSudo) {
+                badge.className = 'badge badge-system';
+                badgeText.innerText = 'Root / Sudo Mode (5s Wait Required)';
+                btn.className = 'btn btn-danger';
+            } else {
+                badge.className = 'badge badge-user';
+                badgeText.innerText = 'User Mode (3s Wait Required)';
+                btn.className = 'btn btn-primary';
+            }
+
+            btn.disabled = true;
+            btn.innerText = `Confirm (${countdown}s)...`;
+
+            if (confirmTimerId) clearInterval(confirmTimerId);
+
+            confirmTimerId = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    btn.innerText = `Confirm (${countdown}s)...`;
+                } else {
+                    clearInterval(confirmTimerId);
+                    confirmTimerId = null;
+                    btn.disabled = false;
+                    btn.innerText = '✓ Confirm & Proceed';
+                }
+            }, 1000);
+
+            currentConfirmCallback = async () => {
+                if (backupPath) {
+                    await downloadBackupIfPossible(backupPath);
+                }
+                onAccept();
+            };
+
+            modal.classList.add('active');
+        }
+
+        function onConfirmAcceptClick() {
+            closeModal('confirmActionModal');
+            if (currentConfirmCallback) {
+                const cb = currentConfirmCallback;
+                currentConfirmCallback = null;
+                cb();
+            }
+        }
+
+        async function loadPermInfo() {
+            const input = document.getElementById('toolsPermPathInput');
+            let path = input.value.trim();
+            if (!path && input.placeholder) {
+                path = input.placeholder;
+                input.value = path;
+            }
+            if (!path) {
+                showToast('Please enter a target path', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/fs/permissions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, action: 'load' })
+                });
+                const data = await res.json();
+                const infoBox = document.getElementById('toolsPermInfoBox');
+                if (res.ok) {
+                    infoBox.style.display = 'block';
+                    infoBox.innerText = `[ls -ld]: ${data.info}`;
+                    if (data.chmod) document.getElementById('toolsChmodInput').value = data.chmod;
+                    if (data.chown) document.getElementById('toolsChownInput').value = data.chown;
+                    document.getElementById('toolsPermRootCheck').checked = data.requires_root;
+                    showToast(`Loaded info for ${path}`, 'success');
+                } else {
+                    infoBox.style.display = 'none';
+                    showToast(data.error || 'Failed to fetch path info', 'error');
+                }
+            } catch (err) {
+                showToast('Failed to connect to server', 'error');
+            }
+        }
+
+        function setChown() {
+            const input = document.getElementById('toolsPermPathInput');
+            let path = input.value.trim();
+            if (!path && input.placeholder) path = input.placeholder;
+            const value = document.getElementById('toolsChownInput').value.trim();
+            const require_root = document.getElementById('toolsPermRootCheck').checked;
+
+            if (!path || !value) {
+                showToast('Path and owner:group value are required for Chown', 'error');
+                return;
+            }
+
+            requestActionConfirmation({
+                title: '🔐 Set Chown Confirmation',
+                message: `Apply chown "${value}" to "${path}"?`,
+                isSudo: require_root,
+                backupPath: null,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch('/api/fs/permissions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path, action: 'chown', value, require_root })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message, 'success');
+                            loadPermInfo();
+                        } else {
+                            showToast(data.error || 'Chown failed', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to apply Chown', 'error');
+                    }
+                }
+            });
+        }
+
+        function setChmod() {
+            const input = document.getElementById('toolsPermPathInput');
+            let path = input.value.trim();
+            if (!path && input.placeholder) path = input.placeholder;
+            const value = document.getElementById('toolsChmodInput').value.trim();
+            const require_root = document.getElementById('toolsPermRootCheck').checked;
+
+            if (!path || !value) {
+                showToast('Path and permissions mode are required for Chmod', 'error');
+                return;
+            }
+
+            requestActionConfirmation({
+                title: '🔐 Set Chmod Confirmation',
+                message: `Apply chmod "${value}" to "${path}"?`,
+                isSudo: require_root,
+                backupPath: null,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch('/api/fs/permissions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path, action: 'chmod', value, require_root })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message, 'success');
+                            loadPermInfo();
+                        } else {
+                            showToast(data.error || 'Chmod failed', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to apply Chmod', 'error');
+                    }
+                }
+            });
+        }
+
+        function executeCopy() {
+            const srcInput = document.getElementById('toolsCopySrcInput');
+            let src = srcInput.value.trim();
+            if (!src && srcInput.placeholder) src = srcInput.placeholder;
+
+            const destInput = document.getElementById('toolsCopyDestInput');
+            let dest = destInput.value.trim();
+            if (!dest && destInput.placeholder) dest = destInput.placeholder;
+
+            const require_root = document.getElementById('toolsCopyRootCheck').checked;
+
+            if (!src || !dest) {
+                showToast('Source path and Destination path are required', 'error');
+                return;
+            }
+
+            requestActionConfirmation({
+                title: '📋 Copy File / Directory Confirmation',
+                message: `Copy "${src}" to "${dest}"?`,
+                isSudo: require_root,
+                backupPath: null,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch('/api/fs/copy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ src, dest, require_root })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.error || 'Copy failed', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to execute Copy', 'error');
+                    }
+                }
+            });
+        }
+
+        function executeMove() {
+            const srcInput = document.getElementById('toolsMoveSrcInput');
+            let src = srcInput.value.trim();
+            if (!src && srcInput.placeholder) src = srcInput.placeholder;
+
+            const destInput = document.getElementById('toolsMoveDestInput');
+            let dest = destInput.value.trim();
+            if (!dest && destInput.placeholder) dest = destInput.placeholder;
+
+            const require_root = document.getElementById('toolsMoveRootCheck').checked;
+
+            if (!src || !dest) {
+                showToast('Source path and Destination path are required', 'error');
+                return;
+            }
+
+            requestActionConfirmation({
+                title: '🚚 Move File / Directory Confirmation',
+                message: `Move "${src}" to "${dest}"?`,
+                isSudo: require_root,
+                backupPath: null,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch('/api/fs/move', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ src, dest, require_root })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.error || 'Move failed', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to execute Move', 'error');
+                    }
+                }
+            });
+        }
+
+        function executeDelete() {
+            const delInput = document.getElementById('toolsDeletePathInput');
+            let path = delInput.value.trim();
+            if (!path && delInput.placeholder) path = delInput.placeholder;
+
+            const require_root = document.getElementById('toolsDeleteRootCheck').checked;
+
+            if (!path) {
+                showToast('Please specify a target path to delete', 'error');
+                return;
+            }
+
+            requestActionConfirmation({
+                title: '🗑 Delete Confirmation',
+                message: `PERMANENTLY DELETE "${path}"?`,
+                isSudo: require_root,
+                backupPath: path,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch('/api/fs/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path, require_root })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message, 'success');
+                        } else {
+                            showToast(data.error || 'Delete failed', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to execute Delete', 'error');
+                    }
+                }
+            });
+        }
+
+        function openRawFileModal(defaultPath) {
+            const input = document.getElementById('rawFilePathInput');
+            if (input) input.value = '';
+            const textarea = document.getElementById('rawFileContentTextarea');
+            if (textarea) textarea.value = '';
+            const statusLabel = document.getElementById('rawFileStatusLabel');
+            if (statusLabel) statusLabel.innerText = 'File Path Content';
+            const modal = document.getElementById('rawFileModal');
+            if (modal) modal.classList.add('active');
+        }
+
+        async function fetchRawFile() {
+            const input = document.getElementById('rawFilePathInput');
+            let path = input.value.trim();
+            if (!path && input.placeholder) {
+                path = input.placeholder;
+                input.value = path;
+            }
+            if (!path) {
+                showToast('Please enter a valid file path', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/file/read?path=${encodeURIComponent(path)}`);
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('rawFileContentTextarea').value = data.content;
+                    document.getElementById('rawFileRootCheck').checked = data.requires_root;
+                    const statusLabel = document.getElementById('rawFileStatusLabel');
+                    if (data.exists) {
+                        statusLabel.innerText = `Content of ${path} (File Exists)`;
+                        showToast(`Loaded file ${path}`, 'success');
+                    } else {
+                        statusLabel.innerText = `Content of ${path} (New File - Will be created upon save)`;
+                        showToast(`File ${path} does not exist yet. Ready for creation.`, 'info');
+                    }
+                } else {
+                    showToast(data.error || 'Failed to read file', 'error');
+                }
+            } catch (err) {
+                showToast('Failed to fetch file from server', 'error');
+            }
+        }
+
+        function saveRawFile() {
+            const path = document.getElementById('rawFilePathInput').value.trim() || document.getElementById('rawFilePathInput').placeholder;
+            const content = document.getElementById('rawFileContentTextarea').value;
+            const require_root = document.getElementById('rawFileRootCheck').checked;
+
+            if (!path) {
+                showToast('Please specify a target file path', 'error');
+                return;
+            }
+
+            requestActionConfirmation({
+                title: '💾 Save Raw File Confirmation',
+                message: `Save changes to file "${path}"?${require_root ? ' (Executing with Root/Sudo)' : ''}`,
+                isSudo: require_root,
+                backupPath: path,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch('/api/file/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path, content, require_root })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message || `Saved file to ${path}`, 'success');
+                            closeModal('rawFileModal');
+                        } else {
+                            showToast(data.error || 'Failed to save file', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to save file', 'error');
+                    }
+                }
+            });
         }
 
         function openRootInfoModal() {
@@ -892,42 +1504,63 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             });
         }
 
-        async function triggerAction(label, scope, action) {
-            try {
-                const res = await fetch(`/api/services/${encodeURIComponent(label)}/action`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action, scope })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    showToast(data.message, 'success');
-                    await fetchServices();
-                } else {
-                    showToast(data.error || 'Action failed', 'error');
+        function triggerAction(label, scope, action) {
+            const isSudo = scope === 'system_daemon' || scope === 'system';
+            const actionCapitalized = action.charAt(0).toUpperCase() + action.slice(1);
+
+            requestActionConfirmation({
+                title: `⚡ ${actionCapitalized} Service Confirmation`,
+                message: `Execute "${action}" on service "${label}"?`,
+                isSudo: isSudo,
+                backupPath: null,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch(`/api/services/${encodeURIComponent(label)}/action`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action, scope })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message, 'success');
+                            await fetchServices();
+                        } else {
+                            showToast(data.error || 'Action failed', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to trigger action', 'error');
+                    }
                 }
-            } catch (err) {
-                showToast('Failed to trigger action', 'error');
-            }
+            });
         }
 
-        async function confirmDelete(label, scope) {
-            if (confirm(`Are you sure you want to delete service "${label}"? This will unload and remove its plist file.`)) {
-                try {
-                    const res = await fetch(`/api/services/${encodeURIComponent(label)}?scope=${encodeURIComponent(scope)}`, {
-                        method: 'DELETE'
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                        showToast(data.message, 'success');
-                        await fetchServices();
-                    } else {
-                        showToast(data.error || 'Delete failed', 'error');
+        function confirmDelete(label, scope) {
+            const isSudo = scope === 'system_daemon' || scope === 'system';
+            const service = allServices.find(s => s.label === label && s.scope === scope);
+            const backupPath = service ? service.plist_path : null;
+
+            requestActionConfirmation({
+                title: '🗑 Delete Service Confirmation',
+                message: `PERMANENTLY DELETE service "${label}"? This will unload the daemon and remove its plist file.`,
+                isSudo: isSudo,
+                backupPath: backupPath,
+                onAccept: async () => {
+                    try {
+                        const res = await fetch(`/api/services/${encodeURIComponent(label)}?scope=${encodeURIComponent(scope)}`, {
+                            method: 'DELETE'
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast(data.message, 'success');
+                            await fetchServices();
+                        } else {
+                            showToast(data.error || 'Delete failed', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Failed to delete service', 'error');
                     }
-                } catch (err) {
-                    showToast('Failed to delete service', 'error');
                 }
-            }
+            });
         }
 
         function openCreateModal() {
@@ -939,7 +1572,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             document.getElementById('formStderr').value = '';
             document.getElementById('formWorkdir').value = '';
             document.getElementById('formInterval').value = '';
-            document.getElementById('rawXmlArea').value = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>Label</key>\n\t<string>com.user.myservice</string>\n\t<key>ProgramArguments</key>\n\t<array>\n\t\t<string>/bin/echo</string>\n\t\t<string>Hello World</string>\n\t</array>\n\t<key>RunAtLoad</key>\n\t<true/>\n</dict>\n</plist>`;
+            document.getElementById('rawXmlArea').value = '';
             switchModalTab('form');
             document.getElementById('serviceModal').classList.add('active');
         }
@@ -990,7 +1623,7 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
             }
         }
 
-        async function saveService() {
+        function saveService() {
             const label = document.getElementById('formLabel').value.trim();
             const scope = document.getElementById('formScope').value;
 
@@ -999,25 +1632,37 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 return;
             }
 
+            const isSudo = scope === 'system' || scope === 'system_daemon';
+            const service = allServices.find(s => s.label === label);
+            const backupPath = service ? service.plist_path : null;
+
             if (activeModalTab === 'raw') {
                 const xml_content = document.getElementById('rawXmlArea').value;
-                try {
-                    const res = await fetch('/api/services/raw', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ label, scope, xml_content })
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                        showToast(data.message, 'success');
-                        closeModal('serviceModal');
-                        await fetchServices();
-                    } else {
-                        showToast(data.error || 'Failed to save raw XML', 'error');
+                requestActionConfirmation({
+                    title: '💾 Save Raw Plist Confirmation',
+                    message: `Save & Register raw Plist for service "${label}"?`,
+                    isSudo: isSudo,
+                    backupPath: backupPath,
+                    onAccept: async () => {
+                        try {
+                            const res = await fetch('/api/services/raw', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ label, scope, xml_content })
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                                showToast(data.message, 'success');
+                                closeModal('serviceModal');
+                                await fetchServices();
+                            } else {
+                                showToast(data.error || 'Failed to save raw XML', 'error');
+                            }
+                        } catch (err) {
+                            showToast('Failed to connect to server', 'error');
+                        }
                     }
-                } catch (err) {
-                    showToast('Failed to connect to server', 'error');
-                }
+                });
             } else {
                 const execRaw = document.getElementById('formExec').value.trim();
                 if (!execRaw) {
@@ -1042,23 +1687,31 @@ pub const INDEX_HTML: &str = r#"<!DOCTYPE html>
                     interval: parseInt(document.getElementById('formInterval').value) || null,
                 };
 
-                try {
-                    const res = await fetch('/api/services', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                        showToast(data.message, 'success');
-                        closeModal('serviceModal');
-                        await fetchServices();
-                    } else {
-                        showToast(data.error || 'Failed to save service', 'error');
+                requestActionConfirmation({
+                    title: '💾 Save Service Confirmation',
+                    message: `Register & Save service "${label}"?`,
+                    isSudo: isSudo,
+                    backupPath: backupPath,
+                    onAccept: async () => {
+                        try {
+                            const res = await fetch('/api/services', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                                showToast(data.message, 'success');
+                                closeModal('serviceModal');
+                                await fetchServices();
+                            } else {
+                                showToast(data.error || 'Failed to save service', 'error');
+                            }
+                        } catch (err) {
+                            showToast('Failed to save service', 'error');
+                        }
                     }
-                } catch (err) {
-                    showToast('Failed to save service', 'error');
-                }
+                });
             }
         }
 

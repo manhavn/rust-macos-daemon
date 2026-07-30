@@ -132,3 +132,13 @@ pub fn remove_file_elevated(path: &std::path::Path, require_root: bool) -> Resul
         Ok(())
     }
 }
+
+/// Send macOS native system desktop notification
+pub fn send_macos_notification(title: &str, message: &str) {
+    let script = format!(
+        "display notification \"{}\" with title \"{}\"",
+        message.replace('"', "\\\""),
+        title.replace('"', "\\\"")
+    );
+    let _ = Command::new("osascript").arg("-e").arg(script).output();
+}

@@ -161,3 +161,77 @@ pub fn validate_raw_xml(xml_content: &str) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Invalid Plist XML syntax: {}", e))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_service_scope_parsing() {
+        assert_eq!(ServiceScope::from_str("user").unwrap(), ServiceScope::User);
+        assert_eq!(ServiceScope::from_str("u").unwrap(), ServiceScope::User);
+        assert_eq!(
+            ServiceScope::from_str("global").unwrap(),
+            ServiceScope::GlobalAgent
+        );
+        assert_eq!(
+            ServiceScope::from_str("global_agent").unwrap(),
+            ServiceScope::GlobalAgent
+        );
+        assert_eq!(
+            ServiceScope::from_str("system").unwrap(),
+            ServiceScope::SystemDaemon
+        );
+        assert_eq!(
+            ServiceScope::from_str("system_daemon").unwrap(),
+            ServiceScope::SystemDaemon
+        );
+        assert_eq!(
+            ServiceScope::from_str("root").unwrap(),
+            ServiceScope::SystemDaemon
+        );
+        assert!(ServiceScope::from_str("invalid_scope").is_err());
+    }
+
+    #[test]
+    fn test_service_scope_root_check() {
+        assert!(!ServiceScope::User.requires_root());
+        assert!(ServiceScope::GlobalAgent.requires_root());
+        assert!(ServiceScope::SystemDaemon.requires_root());
+    }
+
+    #[test]
+    fn test_launchd_plist_construction() {
+        let plist = LaunchdPlist::new(
+            "com.test.service",
+            vec!["/bin/echo".to_string(), "hello".to_string()],
+        );
+        assert_eq!(plist.label, "com.test.service");
+        assert_eq!(
+            plist.program_arguments,
+            Some(vec!["/bin/echo".to_string(), "hello".to_string()])
+        );
+        assert_eq!(plist.run_at_load, Some(true));
+    }
+
+    #[test]
+    fn test_validate_raw_xml() {
+        let valid_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.test</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/mybin</string>
+    </array>
+</dict>
+</plist>"#;
+        assert!(validate_raw_xml(valid_xml).is_ok());
+
+        let invalid_xml = "<dict><key>broken</dict>";
+        assert!(validate_raw_xml(invalid_xml).is_err());
+    }
+}

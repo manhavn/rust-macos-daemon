@@ -1,7 +1,15 @@
 [package]
 name = "macdaemon"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+description = "A modern, high-performance macOS launchd daemon and agent manager with CLI and Web UI"
+authors = ["Bui Van Manh"]
+repository = "https://github.com/manhavn/rust-macos-daemon"
+homepage = "https://github.com/manhavn/rust-macos-daemon"
+license = "MIT"
+readme = "README.md"
+keywords = ["macos", "launchd", "daemon", "agent", "service-manager"]
+categories = ["command-line-utilities", "system::administration"]
 
 [dependencies]
 tokio = { version = "1.38", features = ["full"] }

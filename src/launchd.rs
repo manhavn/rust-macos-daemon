@@ -81,7 +81,7 @@ impl LaunchdManager {
 
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |ext| ext == "plist") {
+                if path.extension().is_some_and(|ext| ext == "plist") {
                     let plist_data = read_plist_from_file(&path).ok();
                     let label = plist_data
                         .as_ref()
@@ -97,9 +97,7 @@ impl LaunchdManager {
                         launchctl_map.get(&label).cloned().unwrap_or((None, None));
 
                     let is_loaded = launchctl_map.contains_key(&label);
-                    let is_enabled = plist_data
-                        .as_ref()
-                        .map_or(true, |p| p.disabled != Some(true));
+                    let is_enabled = plist_data.as_ref().is_none_or(|p| p.disabled != Some(true));
 
                     items.push(DaemonItem {
                         label,
@@ -133,7 +131,7 @@ impl LaunchdManager {
 
         // Modern launchctl bootstrap
         let boot_out = run_command("launchctl", &["bootstrap", &target, &path_str], req_root);
-        if boot_out.as_ref().map_or(false, |o| o.status.success()) {
+        if boot_out.as_ref().is_ok_and(|o| o.status.success()) {
             return Ok(());
         }
 
@@ -160,7 +158,7 @@ impl LaunchdManager {
 
         // Modern launchctl bootout
         let boot_out = run_command("launchctl", &["bootout", &service_target], req_root);
-        if boot_out.as_ref().map_or(false, |o| o.status.success()) {
+        if boot_out.as_ref().is_ok_and(|o| o.status.success()) {
             return Ok(());
         }
 
@@ -224,7 +222,7 @@ impl LaunchdManager {
 
         // Modern kickstart -k
         let out = run_command("launchctl", &["kickstart", "-k", &service_target], req_root);
-        if out.as_ref().map_or(false, |o| o.status.success()) {
+        if out.as_ref().is_ok_and(|o| o.status.success()) {
             return Ok(());
         }
 

@@ -1,70 +1,140 @@
 # macdaemon - macOS Launchd Daemon & Agent Manager
 
-Một ứng dụng Rust mạnh mẽ dành cho macOS cho phép quản lý các dịch vụ tự khởi động (**LaunchAgents** và **LaunchDaemons**) qua cả giao diện **CLI** và **Web UI**. Hỗ trợ truy cập **Sudo / Privilege Escalation** để cấu hình các lệnh cấp hệ thống (Root System Daemon).
+[![CI](https://github.com/manhavn/rust-macos-daemon/actions/workflows/ci.yml/badge.svg)](https://github.com/manhavn/rust-macos-daemon/actions/workflows/ci.yml)
+[![Release](https://github.com/manhavn/rust-macos-daemon/actions/workflows/release.yml/badge.svg)](https://github.com/manhavn/rust-macos-daemon/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon%20%26%20Intel)-lightgrey.svg)](https://apple.com/macos)
+[![Language](https://img.shields.io/badge/Language-Rust-orange.svg)](https://www.rust-lang.org/)
+
+> 🌐 Language: **English** | [Tiếng Việt (Vietnamese README)](README_VI.md)
+
+A high-performance, feature-rich Rust application for macOS that allows managing system auto-start daemons and user agents (**LaunchAgents** and **LaunchDaemons**) through both **CLI** and **Web UI** interfaces. Features built-in **Sudo / Privilege Escalation** to configure system-level root daemons, arbitrary raw file editing, file tools, safety countdown modals, and automatic pre-backup downloads.
 
 ---
 
-## 🌟 Tính Năng Nổi Bật
+## 🖥️ macOS Hardware & Architecture Compatibility
 
-1. **Quản lý đa cấp độ (Scope):**
-   - **User Agent (`~/Library/LaunchAgents`):** Dành cho tài khoản cá nhân.
-   - **Global Agent (`/Library/LaunchAgents`):** Dành cho tất cả người dùng.
-   - **System Daemon (`/Library/LaunchDaemons`):** Khởi chạy cùng hệ thống (Yêu cầu quyền Root/Sudo).
+`macdaemon` provides native precompiled binaries and universal binaries supporting all popular current macOS hardware:
 
-2. **Truy cập Sudo & Privilege Escalation:**
-   - Tự động phát hiện quyền `Root` (`uid == 0`).
-   - Nếu chạy ở chế độ User nhưng thao tác vào `SystemDaemon`, tự động dùng `sudo` hoặc hộp thoại xác thực `osascript` (macOS Administrator privileges).
-
-3. **Chế độ kép (CLI + Web UI):**
-   - **CLI Mode:** Tiện lợi khi thao tác nhanh qua Terminal hoặc Script.
-   - **Web UI Mode:** Giao diện web hiện đại (Dark Glassmorphic UI), hỗ trợ quản lý từ xa (Remote access).
-
-4. **Chỉnh sửa Raw Plist XML & Form Wizard:**
-   - Chế độ nhập liệu trực quan: Executable, ProgramArguments, RunAtLoad, KeepAlive, StandardOutPath, StandardErrorPath, WorkingDirectory, StartInterval, EnvironmentVariables.
-   - Chế độ **Raw XML Editor**: Sửa trực tiếp file `.plist` với trình kiểm tra cú pháp XML tự động trước khi lưu.
-
-5. **Điều khiển dịch vụ qua `launchctl`:**
-   - Hỗ trợ đầy đủ các lệnh: `load` / `unload`, `enable` / `disable`, `start` / `stop`.
-
-6. **Live Log Viewer:**
-   - Xem log stdout / stderr trực tiếp trên giao diện Web UI.
+- 🍏 **Apple Silicon (M1 / M2 / M3 / M4 / M5, Pro, Max, Ultra):** Native `aarch64-apple-darwin` build for maximum performance and power efficiency.
+- 💻 **Intel Macs (Core i5, Core i7, Core i9, Xeon):** Native `x86_64-apple-darwin` build supporting all Intel-based MacBooks, iMacs, Mac minis, and Mac Pros.
+- 🌐 **Universal 2 macOS Binary:** Single fat binary (`universal-apple-darwin`) containing both ARM64 and x86_64 native code slices, running natively on all macOS machines without requiring Rosetta 2.
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Biên Dịch
+## 🚀 Installation
 
-### Yêu cầu:
-- macOS (Apple Silicon / Intel).
-- Rust & Cargo (`rustc` >= 1.70).
+### 1. Via [mise](https://mise.jdx.dev/) (Recommended)
 
-### Build ứng dụng:
+You can install precompiled binaries directly from GitHub Releases using `mise`:
+
 ```bash
-cargo build --release
+# Install globally
+mise use -g github:manhavn/rust-macos-daemon
+
+# Or install for the current directory/project
+mise use github:manhavn/rust-macos-daemon
+
+# Or run directly on the fly without installing
+mise x github:manhavn/rust-macos-daemon -- macdaemon list
+mise x github:manhavn/rust-macos-daemon -- macdaemon web
 ```
-File nhị phân sau khi build nằm tại: `./target/release/macdaemon`
+
+Or add it to your `mise.toml` configuration:
+
+```toml
+[tools]
+"github:manhavn/rust-macos-daemon" = "latest"
+```
+
+### 2. Via Cargo
+
+If you have Rust and Cargo installed:
+
+```bash
+# Install directly from GitHub
+cargo install --git https://github.com/manhavn/rust-macos-daemon.git
+
+# Or install via mise using the cargo backend
+mise use -g cargo:manhavn/rust-macos-daemon
+```
+
+### 3. Build from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/manhavn/rust-macos-daemon.git
+cd rust-macos-daemon
+
+# Build in release mode
+cargo build --release
+
+# Copy binary to your PATH
+sudo cp target/release/macdaemon /usr/local/bin/
+```
 
 ---
 
-## 💻 Hướng Dẫn Sử Dụng CLI
+## 🌟 Key Features
 
-### 1. Xem danh sách các dịch vụ:
+1. **Multi-Scope Management:**
+   - **User Agent (`~/Library/LaunchAgents`):** Personal user account agents (UID level).
+   - **Global Agent (`/Library/LaunchAgents`):** Agents shared across all system users.
+   - **System Daemon (`/Library/LaunchDaemons`):** Root system services starting at boot (Requires Root/Sudo).
+
+2. **Privilege Escalation & Sudo Integration:**
+   - Auto-detects root privileges (`uid == 0`).
+   - If running in User Mode, operations targeting `SystemDaemon` automatically elevate privileges using `sudo` or native macOS Administrator authentication dialogs (`osascript`).
+
+3. **Dual Mode (CLI + Remote Web UI):**
+   - **CLI Mode:** Fast terminal execution and scripting integration.
+   - **Web UI Mode:** Modern Dark Glassmorphism Single-Page Application (SPA) designed for remote management over local network or server environments.
+
+4. **Form Wizard & Raw Plist XML Editors:**
+   - **Form Editor:** Visual configuration for Executable path, Arguments, RunAtLoad, KeepAlive, StandardOutPath, StandardErrorPath, WorkingDirectory, and StartInterval.
+   - **Raw Plist XML Editor:** Direct `.plist` XML editing with strict DTD validation before saving.
+
+5. **Raw Arbitrary File Editor Mode:**
+   - Read and edit any absolute file path on macOS directly in the Web UI (with optional Sudo elevation).
+
+6. **File & Directory Management Tools:**
+   - **Permissions & Ownership (`Chown` / `Chmod`):** Auto-fetches and pre-fills current ownership (`owner:group`) and octal mode (`chmod`) when loading path info.
+   - **Copy (`cp -R`):** Copy files or directories with recursive & Sudo options.
+   - **Move (`mv`):** Move or rename files and directories.
+   - **Delete (`rm -rf`):** Safely delete files or folders.
+
+7. **Safety Countdown Confirmation Modals:**
+   - All submit and destructive operations trigger a compact confirmation modal with enforced countdown delays (**3 seconds** for User Mode, **5 seconds** for Sudo/Root Mode) before enabling the confirm button.
+
+8. **Automatic Pre-Backup Downloads:**
+   - Automatically triggers a browser file download of the original file content before performing file content overwrites or path deletions.
+   - **Filename Format:** `(sanitized-directory-timestamp-filename)` with all slashes and special characters converted to hyphens.
+
+9. **macOS System Notifications:**
+   - Triggers native macOS Notification Center alerts when the server starts.
+
+---
+
+## 💻 CLI Usage Guide
+
+### 1. List Services:
 ```bash
-# Xem tất cả
+# List all services
 macdaemon list
 
-# Lọc theo scope (user, global, system)
+# Filter by scope (user, global, system)
 macdaemon list --scope system
 
-# Xuất dạng JSON (Dành cho việc tích hợp script)
+# Output JSON format for scripts
 macdaemon list --json
 ```
 
-### 2. Xem chi tiết thông tin và nội dung plist:
+### 2. View Service Detail & Plist XML:
 ```bash
 macdaemon info com.example.mydaemon --scope user
 ```
 
-### 3. Đăng ký lệnh tự khởi động mới (Add Service):
+### 3. Register a New User Auto-Start Service:
 ```bash
 macdaemon add \
   --label com.user.myservice \
@@ -77,7 +147,7 @@ macdaemon add \
   --stderr "/tmp/myservice.stderr.log"
 ```
 
-### 4. Đăng ký lệnh tự khởi chạy cấp hệ thống System Root (LaunchDaemon):
+### 4. Register a System Root LaunchDaemon:
 ```bash
 sudo macdaemon add \
   --label com.system.mydaemon \
@@ -86,7 +156,7 @@ sudo macdaemon add \
   --scope system
 ```
 
-### 5. Khởi chạy / Dừng / Bật / Tắt dịch vụ:
+### 5. Service Control Operations:
 ```bash
 macdaemon start com.user.myservice
 macdaemon stop com.user.myservice
@@ -94,35 +164,27 @@ macdaemon load com.user.myservice
 macdaemon unload com.user.myservice
 ```
 
-### 6. Xoá lệnh đã đăng ký:
+### 6. Remove Service:
 ```bash
 macdaemon remove com.user.myservice --scope user
 ```
 
-### 7. Sửa file Plist trực tiếp dạng Raw XML:
-```bash
-macdaemon raw-edit com.user.myservice --scope user
-```
-
 ---
 
-## 🌐 Hướng Dẫn Sử Dụng Web UI (Remote Management)
+## 🌐 Web UI Usage (Remote Management)
 
-Để mở giao diện quản lý trên trình duyệt:
+Start the embedded Web UI server:
 
 ```bash
-# Chạy Web Server tại localhost:8990 và tự mở trình duyệt
+# Start server bound to 127.0.0.1:8990
 macdaemon web
 
-# Hoặc lắng nghe trên tất cả IP mạng local để truy cập từ xa (Remote access)
+# Listen on all network interfaces for remote management
 macdaemon web --host 0.0.0.0 --port 8990
-```
 
-Nếu chạy với quyền `sudo`:
-```bash
+# Run with Root privileges for full system control
 sudo macdaemon web --host 0.0.0.0 --port 8990
 ```
-Web UI sẽ có đầy đủ quyền thao tác trực tiếp trên tất cả các `LaunchDaemons` của toàn bộ hệ thống!
 
 ---
 
@@ -130,21 +192,28 @@ Web UI sẽ có đầy đủ quyền thao tác trực tiếp trên tất cả c�
 
 ```
 rust-macos-daemon/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml             # CI: Formatting, Clippy, and Tests
+│       └── release.yml        # Multi-architecture & Universal macOS Release builds
 ├── Cargo.toml
-├── README.md
+├── LICENSE                    # MIT License
+├── README.md                  # Main Documentation (English)
+├── README_VI.md               # Documentation in Vietnamese
 └── src/
-    ├── main.rs            # Entrypoint (CLI / Web UI dispatcher)
-    ├── cli.rs             # CLI argument parsing (clap) & commands logic
-    ├── model.rs           # Data structures, Plist models, Raw XML validator
-    ├── privilege.rs       # Sudo & Administrative privilege escalation helper
-    ├── launchd.rs         # macOS launchctl wrapper & directory scanner
+    ├── main.rs                # Entrypoint (CLI / Web UI dispatcher)
+    ├── cli.rs                 # CLI argument parsing (clap) & commands logic
+    ├── model.rs               # Data structures, Plist models, Raw XML validator
+    ├── privilege.rs           # Sudo & Administrative privilege escalation helper
+    ├── launchd.rs             # macOS launchctl wrapper & directory scanner
     └── web/
-        ├── mod.rs         # Axum server setup & route definitions
-        ├── api.rs         # REST API endpoints
-        └── static_assets.rs # Embedded Glassmorphism SPA Web UI (HTML/CSS/JS)
+        ├── mod.rs             # Axum server setup & route definitions
+        ├── api.rs             # REST API endpoints (Service CRUD, FS tools, Logs)
+        └── static_assets.rs   # Embedded Dark Glassmorphic SPA (HTML/CSS/JS)
 ```
 
 ---
 
 ## 📜 License
-MIT License
+
+This project is licensed under the [MIT License](LICENSE).

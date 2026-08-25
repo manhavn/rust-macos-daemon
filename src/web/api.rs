@@ -464,7 +464,7 @@ pub async fn manage_permissions(Json(req): Json<PermissionRequest>) -> impl Into
             }
 
             let out = match std::process::Command::new("ls")
-                .args(&["-ld", &req.path])
+                .args(["-ld", &req.path])
                 .output()
             {
                 Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
